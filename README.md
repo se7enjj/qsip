@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
 > **Status**: v0.2 Lab Prototype (March 2026) — Not production-ready  
-> **License**: Apache 2.0  
+> **License**: [Apache 2.0](https://github.com/se7enjj/qsip/blob/main/LICENSE)  
 > **Security Policy**: [SECURITY.md](SECURITY.md)  
 > **Architecture**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
