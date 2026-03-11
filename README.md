@@ -453,10 +453,9 @@ code. The PQC mathematical hardness is proven by NIST's evaluation, not by tests
 ## Contributing
 
 1. Read [SECURITY.md](SECURITY.md) — security rules are non-negotiable  
-2. Read [`.github/copilot-instructions.md`](.github/copilot-instructions.md) before touching code  
-3. All crypto must use `oqs` (liboqs) or `cryptography` (PyCA) — never implement primitives  
-4. All PRs require passing CI (security scan + tests + type check)  
-5. Never commit `.env` — only `.env.example` belongs in git
+2. All crypto must use `oqs` (liboqs) or `cryptography` (PyCA) — never implement primitives  
+3. All PRs require passing CI (security scan + tests + type check)  
+4. Never commit `.env` — only `.env.example` belongs in git
 
 **Maintainer**: Jago König — jago.koenig@proton.me  
 **Security reports**: jago.koenig@proton.me (subject: `[QSIP SECURITY] ...`)

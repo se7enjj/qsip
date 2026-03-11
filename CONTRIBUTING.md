@@ -8,9 +8,7 @@ QSIP is security-critical infrastructure. Please read this document fully before
 ## Before You Start
 
 1. Read [SECURITY.md](SECURITY.md) — the security rules are non-negotiable.
-2. Read [`.github/copilot-instructions.md`](.github/copilot-instructions.md) — the architectural
-   constraints and coding standards for this project.
-3. Check [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for layer dependency rules.
+2. Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for layer dependency rules.
 
 ---
 
