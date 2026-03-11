@@ -1,0 +1,188 @@
+name: QSIP CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IMPORTANT: The mock-based test job (test-mock) runs on every push with no
+# native build step — sub-minute feedback.  The native liboqs job (test-native)
+# builds liboqs 0.15.0 from source (result is cached by version tag) and runs
+# on pushes to main only.
+# ─────────────────────────────────────────────────────────────────────────────
+
+jobs:
+  # ── Fast path: run with behaviorally-correct oqs mock (no C build) ──────────
+  test-mock:
+    name: Tests / Python ${{ matrix.python-version }} / mock PQC
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+          pip install "genbadge[coverage]"
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v \
+            --cov=src \
+            --cov-report=xml:coverage.xml \
+            --cov-report=term-missing \
+            --cov-fail-under=80
+        env:
+          QSIP_ENV: testing
+          QSIP_LOG_LEVEL: WARNING
+          QSIP_KEM_ALGORITHM: Kyber1024
+          QSIP_SIG_ALGORITHM: ML-DSA-87
+          QSIP_HYBRID_MODE: "false"
+          QSIP_KEYSTORE_PASSPHRASE: ci-test-passphrase-not-a-secret
+
+      - name: Generate coverage badge SVG
+        if: matrix.python-version == '3.12'
+        run: genbadge coverage -i coverage.xml -o coverage-badge.svg
+
+      - name: Upload coverage artifacts
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            coverage-badge.svg
+          retention-days: 30
+
+  # ── Native liboqs 0.15.0 build — cached by version tag ──────────────────────
+  test-native:
+    name: Tests / native liboqs 0.15.0 / Python 3.12
+    runs-on: ubuntu-latest
+    # Only run on pushes to main to avoid burning CI minutes on every branch push
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Cache liboqs build (keyed by version)
+        uses: actions/cache@v4
+        id: cache-liboqs
+        with:
+          path: /tmp/liboqs-install
+          key: liboqs-0.15.0-ubuntu-latest-v2
+
+      - name: Install liboqs build dependencies
+        if: steps.cache-liboqs.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake ninja-build libssl-dev
+
+      - name: Build liboqs 0.15.0 from source
+        if: steps.cache-liboqs.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch 0.15.0 \
+            https://github.com/open-quantum-safe/liboqs.git /tmp/liboqs-src
+          cmake -S /tmp/liboqs-src -B /tmp/liboqs-src/build \
+            -GNinja \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_INSTALL_PREFIX=/tmp/liboqs-install
+          cmake --build /tmp/liboqs-src/build --target install
+
+      - name: Install liboqs system-wide
+        run: |
+          sudo cp -r /tmp/liboqs-install/lib/* /usr/local/lib/
+          sudo cp -r /tmp/liboqs-install/include/* /usr/local/include/
+          sudo ldconfig
+
+      - name: Install Python dependencies (including liboqs-python)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+          pip install liboqs-python
+
+      - name: Run tests against native liboqs
+        run: |
+          pytest tests/ -v \
+            --cov=src \
+            --cov-report=term-missing \
+            --cov-fail-under=80
+        env:
+          QSIP_ENV: testing
+          QSIP_LOG_LEVEL: WARNING
+          QSIP_KEM_ALGORITHM: Kyber1024
+          QSIP_SIG_ALGORITHM: ML-DSA-87
+          QSIP_HYBRID_MODE: "false"
+          QSIP_KEYSTORE_PASSPHRASE: ci-test-passphrase-not-a-secret
+          LD_LIBRARY_PATH: /usr/local/lib
+
+  # ── Security static analysis ─────────────────────────────────────────────────
+  security-checks:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install security tools
+        run: pip install "bandit[toml]" pip-audit
+
+      - name: Bandit SAST (severity >= MEDIUM)
+        run: bandit -r src/ -ll
+
+      - name: pip-audit CVE scan
+        run: pip-audit -r requirements.txt
+
+      - name: Verify .env is not committed
+        run: |
+          if git ls-files | grep -qE '^\.env$'; then
+            echo "ERROR: .env file committed to repository!" >&2
+            exit 1
+          fi
+
+  # ── Static type checking ──────────────────────────────────────────────────────
+  type-check:
+    name: Type Checking (mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run mypy
+        run: mypy src/ --strict --ignore-missing-imports

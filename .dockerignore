@@ -1,0 +1,33 @@
+# Build artifacts
+__pycache__/
+*.py[cod]
+*.so
+.eggs/
+dist/
+build/
+*.egg-info/
+
+# Dev tools
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Secrets — NEVER send to Docker build context
+.env
+keystore/
+*.pem
+*.key
+*.p12
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Git
+.git/
+.gitignore

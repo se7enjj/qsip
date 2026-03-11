@@ -1,0 +1,37 @@
+# ============================================================
+# QSIP — Production Dependencies
+# Pin exact versions for reproducible, auditable builds.
+# Update via: pip-compile requirements.in
+# Verify integrity: pip install --require-hashes -r requirements.txt
+# ============================================================
+
+# Post-Quantum Cryptography (liboqs Python bindings)
+# NIST FIPS 203 (Kyber) + FIPS 204 (Dilithium) + FIPS 205 (SPHINCS+)
+# NOTE: This is NOT the PyPI 'oqs' package (that is an unrelated OQS Interpreter).
+# liboqs-python wraps the native Open Quantum Safe C library.
+# See docs/ARCHITECTURE.md for native build instructions on Windows / Linux.
+liboqs-python>=0.10.0
+
+# Classical cryptography — AES-GCM, HKDF, X25519, Argon2id
+# Used for hybrid mode and symmetric operations
+cryptography>=42.0.0
+
+# DNS resolution and DNSSEC record parsing
+dnspython>=2.6.0
+
+# Environment variable loading — NEVER use os.environ directly in modules
+python-dotenv>=1.0.0
+
+# Configuration validation with type safety
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# ── Web server (QSIP Live Demo UI) ──────────────────────────────────────────
+# FastAPI async web framework — powers /api/stream/* SSE endpoints
+fastapi>=0.110.0
+
+# ASGI server — run with: python serve.py  or  uvicorn src.web.server:app
+uvicorn[standard]>=0.27.0
+
+# Required by FastAPI for SSE / streaming responses
+anyio>=4.0.0

@@ -1,0 +1,29 @@
+# ============================================================
+# QSIP — Development & Testing Dependencies
+# NOT installed in production environments.
+# ============================================================
+
+# Core test framework
+pytest>=8.0.0
+pytest-cov>=5.0.0
+
+# Async test support (for transport layer tests)
+pytest-asyncio>=0.23.0
+
+# Type checking
+mypy>=1.9.0
+
+# Linting, formatting, security
+ruff>=0.4.0
+bandit[toml]>=1.7.8
+
+# Dependency vulnerability scanning
+pip-audit>=2.7.0
+safety>=3.0.0
+
+# Test utilities
+hypothesis>=6.100.0     # Property-based testing for crypto edge cases
+freezegun>=1.4.0        # Freeze time for key rotation tests
+
+# Pre-commit hooks
+pre-commit>=3.7.0

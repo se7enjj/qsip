@@ -1,0 +1,117 @@
+# ============================================================
+# QSIP – Quantum-Safe Internet Protocol Suite
+# .gitignore  —  NEVER commit secrets or generated key material
+# ============================================================
+
+# ----- Environment & Secrets (CRITICAL) -----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.der
+secrets/
+private_keys/
+key_material/
+
+# ----- Python -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ----- Virtual Environments -----
+venv/
+.venv/
+.venv-wsl/
+env/
+ENV/
+.env/
+pyvenv.cfg
+
+# ----- Scratch / draft files -----
+demo_skeleton.py
+
+# ----- Testing & Coverage -----
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pytestdebug.log
+
+# ----- Type Checking -----
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyright/
+
+# ----- Jupyter -----
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# ----- OS -----
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ----- IDEs -----
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ----- Logs -----
+logs/
+*.log
+*.log.*
+npm-debug.log*
+
+# ----- Generated crypto artifacts -----
+generated_keys/
+test_keys/
+*.kyber
+*.dilithium
+*.zk_proof
+
+# ----- Rust (future) -----
+target/
+Cargo.lock
+
+# ----- Node (future tooling) -----
+node_modules/

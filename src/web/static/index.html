@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QSIP — Quantum-Safe Internet Protocol Suite</title>
+<style>
+  :root {
+    --bg:      #0d1117;
+    --surface: #161b22;
+    --border:  #30363d;
+    --green:   #3fb950;
+    --cyan:    #58a6ff;
+    --orange:  #d29922;
+    --red:     #f85149;
+    --purple:  #bc8cff;
+    --dim:     #8b949e;
+    --text:    #c9d1d9;
+    --bold:    #f0f6fc;
+    --font-mono: "JetBrains Mono","Fira Code","Consolas",monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 13px; }
+
+  /* ── Layout ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; background: var(--surface);
+    border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
+  }
+  .logo { font-size: 18px; font-weight: 700; color: var(--bold); letter-spacing: -0.5px; }
+  .logo span { color: var(--cyan); }
+  .backend-badge {
+    font-size: 11px; padding: 4px 10px; border-radius: 12px;
+    background: #1c2a1c; color: var(--green); border: 1px solid #2ea043;
+  }
+  .backend-badge.mock { background: #1a1a2e; color: var(--orange); border-color: var(--orange); }
+
+  main { max-width: 920px; margin: 0 auto; padding: 24px 16px; }
+
+  .tabs {
+    display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .tab {
+    padding: 7px 16px; border-radius: 6px; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--border); color: var(--dim);
+    font-family: var(--font-mono); font-size: 12px; transition: all .15s;
+  }
+  .tab:hover { border-color: var(--cyan); color: var(--cyan); }
+  .tab.active { background: #0d2340; border-color: var(--cyan); color: var(--cyan); font-weight: 600; }
+  .tab.run-all { border-color: var(--green); color: var(--green); }
+  .tab.run-all:hover, .tab.run-all.active { background: #0f2a18; }
+
+  /* ── Console panel ── */
+  .console {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden;
+  }
+  .console-toolbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; background: #0d1117;
+    border-bottom: 1px solid var(--border);
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-red    { background: #f85149; }
+  .dot-yellow { background: #d29922; }
+  .dot-green  { background: #3fb950; }
+  .console-title { font-size: 11px; color: var(--dim); flex: 1; text-align: center; margin-right: 90px; }
+  .console-output {
+    padding: 16px; min-height: 320px; max-height: 600px; overflow-y: auto;
+    line-height: 1.7;
+  }
+  .console-output:empty::before { content: "Press a button above to start the demo."; color: var(--dim); }
+
+  /* ── SSE line types ── */
+  .ev-section  { margin-top: 20px; }
+  .ev-section .title { font-size: 14px; font-weight: 700; color: var(--bold); }
+  .ev-section .subtitle { font-size: 11px; color: var(--dim); margin-top: 2px; }
+  .ev-step { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; margin-bottom: 6px; }
+  .ev-step::before { content: "▶"; color: var(--cyan); flex-shrink: 0; }
+  .ev-step-label { color: var(--cyan); font-weight: 600; }
+  .ev-kv { display: grid; grid-template-columns: 190px 1fr; gap: 4px; padding: 1px 0 1px 22px; }
+  .ev-kv .k { color: var(--dim); }
+  .ev-kv .v { color: var(--bold); }
+  .ev-kv .note { grid-column: 2; font-size: 11px; color: var(--dim); font-style: italic; }
+  .ev-bytes { padding: 2px 22px; color: var(--purple); font-size: 11px; word-break: break-all; }
+  .ev-ok { display: flex; gap: 8px; align-items: flex-start; padding: 3px 22px; margin-top: 4px; }
+  .ev-ok::before { content: "✓"; color: var(--green); flex-shrink: 0; }
+  .ev-ok span { color: var(--green); }
+  .ev-fail { display: flex; gap: 8px; align-items: flex-start; padding: 3px 22px; }
+  .ev-fail::before { content: "✗"; color: var(--red); flex-shrink: 0; }
+  .ev-fail span { color: var(--red); }
+  .ev-attack { display: flex; gap: 8px; align-items: flex-start; padding: 4px 22px; margin-top: 8px; 
+               background: #1c1207; border-left: 3px solid var(--orange); border-radius: 0 4px 4px 0; }
+  .ev-attack::before { content: "⚡"; flex-shrink: 0; }
+  .ev-attack span { color: var(--orange); }
+  .ev-attack + .ev-ok, .ev-attack + .ev-fail { margin-top: 0; padding-left: 22px; }
+  .ev-done {
+    margin-top: 20px; padding: 14px 18px; background: #0f2a18; border: 1px solid var(--green);
+    border-radius: 6px; color: var(--green);
+  }
+  .ev-done .big { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .ev-done .meta { font-size: 11px; color: var(--dim); }
+  .ev-start { padding: 6px 0; color: var(--dim); font-size: 11px; }
+
+  /* ── Spinner ── */
+  .spinner { display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--border); border-top-color: var(--cyan);
+    border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Stats cards ── */
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .stat-card .val { font-size: 22px; font-weight: 700; color: var(--bold); }
+  .stat-card .lbl { font-size: 11px; color: var(--dim); margin-top: 4px; }
+
+  /* ── Actions row ── */
+  .actions-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  .btn {
+    padding: 9px 18px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-family: var(--font-mono);
+    font-size: 12px; cursor: pointer; transition: all .15s;
+  }
+  .btn:hover { border-color: var(--cyan); color: var(--cyan); }
+  .btn.primary { border-color: var(--green); color: var(--green); }
+  .btn.primary:hover { background: #0f2a18; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ── JSON result panel ── */
+  .json-panel {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px 14px; margin-top: 12px; display: none;
+  }
+  .json-panel.visible { display: block; }
+  .json-panel pre { color: var(--text); font-size: 12px; white-space: pre-wrap; }
+  .json-key   { color: var(--cyan); }
+  .json-str   { color: var(--green); }
+  .json-num   { color: var(--purple); }
+  .json-bool  { color: var(--orange); }
+
+  footer { text-align: center; padding: 24px; color: var(--dim); font-size: 11px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">QSIP <span>·</span> Quantum-Safe Internet Protocol Suite</div>
+  <div id="backendBadge" class="backend-badge mock" title="Loading…">loading…</div>
+</header>
+
+<main>
+
+  <!-- Stats row populated from /api/status -->
+  <div class="stats-row" id="statsRow">
+    <div class="stat-card"><div class="val" id="statKem">—</div><div class="lbl">KEM (key exchange)</div></div>
+    <div class="stat-card"><div class="val" id="statSig">—</div><div class="lbl">Signature</div></div>
+    <div class="stat-card"><div class="val" id="statNist">FIPS 203/204</div><div class="lbl">NIST standards</div></div>
+    <div class="stat-card"><div class="val" id="statBackend">—</div><div class="lbl">Backend</div></div>
+  </div>
+
+  <!-- Tabs / buttons -->
+  <div class="tabs">
+    <button class="tab run-all" onclick="runStream('all')">▶ Run Full Demo (all 4 layers)</button>
+    <button class="tab" onclick="runStream('identity')">Layer 1 · ZK Identity</button>
+    <button class="tab" onclick="runStream('email')">Layer 2 · PQEP Email</button>
+    <button class="tab" onclick="runStream('dns')">Layer 3 · PQC DNS</button>
+    <button class="tab" onclick="runStream('httpq')">Layer 4 · HTTPQ</button>
+  </div>
+
+  <!-- Console output -->
+  <div class="console">
+    <div class="console-toolbar">
+      <div class="dot dot-red"></div>
+      <div class="dot dot-yellow"></div>
+      <div class="dot dot-green"></div>
+      <div class="console-title" id="consoleTitle">qsip-demo — idle</div>
+      <div id="spinner" style="display:none"><div class="spinner"></div></div>
+    </div>
+    <div class="console-output" id="output"></div>
+  </div>
+
+  <!-- One-shot action buttons -->
+  <div class="actions-row">
+    <button class="btn primary" onclick="doKeyGen()">Generate Keypair</button>
+    <button class="btn" onclick="doHandshake()">HTTPQ Handshake</button>
+    <button class="btn" onclick="clearOutput()">Clear</button>
+  </div>
+  <div class="json-panel" id="jsonPanel"><pre id="jsonPre"></pre></div>
+
+</main>
+
+<footer>
+  QSIP v0.1.0 · NIST FIPS 203 (ML-KEM-1024) · NIST FIPS 204 (ML-DSA-87) · SHA-3 · AES-256-GCM
+</footer>
+
+<script>
+"use strict";
+
+let activeSource = null;
+
+/* ── Load /api/status ─────────────────────────────────────────────────────── */
+(async () => {
+  try {
+    const r = await fetch("/api/status");
+    const d = await r.json();
+    const badge = document.getElementById("backendBadge");
+    if (d.native) {
+      badge.className = "backend-badge";
+      badge.textContent = "native liboqs";
+    } else {
+      badge.className = "backend-badge mock";
+      badge.textContent = "mock PQC";
+      badge.title = "liboqs not found on this system — using HMAC-SHA3 simulation";
+    }
+    document.getElementById("statKem").textContent     = (d.fips203 || "Kyber1024").replace("ML-KEM-","ML-KEM\n");
+    document.getElementById("statSig").textContent     = (d.fips204 || "ML-DSA-87").replace("Dilithium","MLDSA-");
+    document.getElementById("statBackend").textContent = d.native ? "Native" : "Mock";
+  } catch(e) {
+    document.getElementById("backendBadge").textContent = "server offline";
+  }
+})();
+
+/* ── SSE stream runner ────────────────────────────────────────────────────── */
+function runStream(layer) {
+  if (activeSource) { activeSource.close(); activeSource = null; }
+  const out = document.getElementById("output");
+  out.innerHTML = "";
+  document.getElementById("jsonPanel").classList.remove("visible");
+  document.getElementById("consoleTitle").textContent = `qsip-demo — streaming /api/stream/${layer}`;
+  document.getElementById("spinner").style.display = "block";
+
+  const es = new EventSource(`/api/stream/${layer}`);
+  activeSource = es;
+
+  es.onmessage = ev => {
+    const d = JSON.parse(ev.data);
+    appendEvent(out, d);
+    out.scrollTop = out.scrollHeight;
+  };
+
+  es.onerror = () => {
+    es.close(); activeSource = null;
+    document.getElementById("spinner").style.display = "none";
+    document.getElementById("consoleTitle").textContent = "qsip-demo — connection closed";
+  };
+}
+
+/* ── Render an SSE event ─────────────────────────────────────────────────── */
+function appendEvent(out, d) {
+  let el = null;
+  switch (d.type) {
+    case "start": {
+      el = document.createElement("div");
+      el.className = "ev-start";
+      el.textContent = `backend: ${d.backend}`;
+      break;
+    }
+    case "section": {
+      el = document.createElement("div");
+      el.className = "ev-section";
+      el.innerHTML = `<div class="title">${esc(d.title)}</div>` +
+                     (d.subtitle ? `<div class="subtitle">${esc(d.subtitle)}</div>` : "");
+      break;
+    }
+    case "step": {
+      el = document.createElement("div");
+      el.className = "ev-step";
+      el.innerHTML = `<span class="ev-step-label">${esc(d.label)}</span>`;
+      break;
+    }
+    case "kv": {
+      el = document.createElement("div");
+      el.className = "ev-kv";
+      el.innerHTML = `<span class="k">${esc(d.key)}</span><span class="v">${esc(d.value)}</span>` +
+                     (d.note ? `<span class="note">${esc(d.note)}</span>` : "");
+      break;
+    }
+    case "bytes": {
+      el = document.createElement("div");
+      el.className = "ev-bytes";
+      el.textContent = `${d.label} (${d.bytes} B): ${d.hex}`;
+      break;
+    }
+    case "ok": {
+      el = document.createElement("div");
+      el.className = "ev-ok";
+      el.innerHTML = `<span>${esc(d.msg)}</span>`;
+      break;
+    }
+    case "fail": {
+      el = document.createElement("div");
+      el.className = "ev-fail";
+      el.innerHTML = `<span>${esc(d.msg)}</span>`;
+      break;
+    }
+    case "attack": {
+      el = document.createElement("div");
+      el.className = "ev-attack";
+      el.innerHTML = `<span>${esc(d.label)}</span>`;
+      break;
+    }
+    case "done": {
+      el = document.createElement("div");
+      el.className = "ev-done";
+      el.innerHTML = `<div class="big">✓ All ${d.layers || ""} layers complete — ${d.runtime_ms} ms</div>` +
+                     `<div class="meta">backend: ${esc(d.backend || "")} &nbsp;|&nbsp; native liboqs: ${d.native}</div>`;
+      document.getElementById("spinner").style.display = "none";
+      document.getElementById("consoleTitle").textContent = `qsip-demo — done (${d.runtime_ms} ms)`;
+      if (activeSource) { activeSource.close(); activeSource = null; }
+      break;
+    }
+    default:
+      break;
+  }
+  if (el) out.appendChild(el);
+}
+
+function esc(s) {
+  if (!s) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+/* ── JSON action panel helpers ───────────────────────────────────────────── */
+function showJSON(data) {
+  const panel = document.getElementById("jsonPanel");
+  const pre   = document.getElementById("jsonPre");
+  pre.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+  panel.classList.add("visible");
+  panel.scrollIntoView({behavior:"smooth"});
+}
+
+function syntaxHighlight(json) {
+  return json
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"(\\u[\da-f]{4}|\\[^u]|[^\\"])*"(\s*:)?/g, m =>
+      /:$/.test(m) ? `<span class="json-key">${m}</span>` : `<span class="json-str">${m}</span>`)
+    .replace(/\b(true|false)\b/g,`<span class="json-bool">$1</span>`)
+    .replace(/\b(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/g,`<span class="json-num">$1</span>`);
+}
+
+async function doKeyGen() {
+  try {
+    const r = await fetch("/api/keygen", {method:"POST"});
+    showJSON(await r.json());
+  } catch(e) { showJSON({error: String(e)}); }
+}
+
+async function doHandshake() {
+  try {
+    const r = await fetch("/api/handshake", {method:"POST"});
+    showJSON(await r.json());
+  } catch(e) { showJSON({error: String(e)}); }
+}
+
+function clearOutput() {
+  if (activeSource) { activeSource.close(); activeSource = null; }
+  document.getElementById("output").innerHTML = "";
+  document.getElementById("jsonPanel").classList.remove("visible");
+  document.getElementById("consoleTitle").textContent = "qsip-demo — idle";
+  document.getElementById("spinner").style.display = "none";
+}
+</script>
+</body>
+</html>

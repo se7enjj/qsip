@@ -1,0 +1,120 @@
+[build-system]
+requires = ["setuptools>=69.0", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "qsip"
+version = "0.1.0"
+description = "Quantum-Safe Internet Protocol Suite — PQC Identity, DNS, and Email"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+keywords = ["post-quantum", "cryptography", "email", "dns", "identity", "zero-knowledge"]
+# Runtime dependencies (liboqs-python must be installed separately — see README)
+dependencies = [
+    "cryptography>=42.0.0",
+    "dnspython>=2.6.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Security :: Cryptography",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.scripts]
+# After `pip install -e .` these commands become available on PATH:
+#   qsip keygen --label alice@example.com
+#   qsip email encrypt --sender <id> --recipient-pk <hex> --input msg.txt --output msg.pqep
+#   qsip email decrypt --recipient <id> --input msg.pqep
+#   qsip dns make-record --signer <id> --domain example.com --payload "A 93.184.216.34"
+#   qsip dns verify --record "v=QSIP1;..." --domain example.com --payload "A 93.184.216.34"
+#   qsip demo
+qsip = "src.cli.main:main"
+
+[project.urls]
+Repository = "https://github.com/your-org/qsip"
+Documentation = "https://github.com/your-org/qsip/blob/main/docs/ARCHITECTURE.md"
+"Security Policy" = "https://github.com/your-org/qsip/blob/main/SECURITY.md"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+# ──────────────────────────────────────────────
+# Pytest
+# ──────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+pythonpath = ["."]
+
+# ──────────────────────────────────────────────
+# Coverage
+# ──────────────────────────────────────────────
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "**/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80
+
+# ──────────────────────────────────────────────
+# Mypy
+# ──────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+# ──────────────────────────────────────────────
+# Bandit (Security SAST)
+# ──────────────────────────────────────────────
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "venv"]
+# Skip assert tests (B101) only in test files
+skips = []
+severity = "medium"
+
+[tool.bandit.assert_used]
+skips = ["**/tests/**"]
+
+# ──────────────────────────────────────────────
+# Ruff (Linter / Formatter)
+# ──────────────────────────────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "S",    # flake8-bandit (security)
+    "UP",   # pyupgrade
+    "ANN",  # annotations
+]
+ignore = [
+    "ANN101",  # missing type for `self`
+    "ANN102",  # missing type for `cls`
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # allow assert in tests
