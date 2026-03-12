@@ -170,11 +170,20 @@ def cmd_email_encrypt(args: argparse.Namespace) -> int:
     store = KeyStore(config)
     sender = store.load(args.sender)
 
-    # Load recipient public key
-    if args.recipient_pk.startswith("/") or Path(args.recipient_pk).exists():
-        recipient_pk_hex = Path(args.recipient_pk).read_text().strip()
+    # Load recipient public key — check for file path first.
+    # Guard Path.exists() with OSError: on Linux, a long hex key string
+    # exceeds NAME_MAX (255) and raises [Errno 36] File name too long.
+    _pk_arg = args.recipient_pk.strip()
+    _is_file = _pk_arg.startswith("/") or _pk_arg.startswith(".")
+    if not _is_file:
+        try:
+            _is_file = Path(_pk_arg).exists()
+        except OSError:
+            _is_file = False
+    if _is_file:
+        recipient_pk_hex = Path(_pk_arg).read_text().strip()
     else:
-        recipient_pk_hex = args.recipient_pk.strip()
+        recipient_pk_hex = _pk_arg
 
     try:
         recipient_pk = bytes.fromhex(recipient_pk_hex)
