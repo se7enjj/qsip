@@ -30,6 +30,17 @@ import oqs
 from src.common.config import Config
 from src.common.exceptions import QSIPCryptoError
 
+# Bidirectional alias map between liboqs legacy names and NIST FIPS 204 final names.
+# liboqs >= 0.10.0 uses ML-DSA-* exclusively; older builds used Dilithium*.
+_SIG_ALIASES: dict[str, str] = {
+    "Dilithium2": "ML-DSA-44",
+    "Dilithium3": "ML-DSA-65",
+    "Dilithium5": "ML-DSA-87",
+    "ML-DSA-44": "Dilithium2",
+    "ML-DSA-65": "Dilithium3",
+    "ML-DSA-87": "Dilithium5",
+}
+
 
 @dataclass(frozen=True)
 class SignatureKeypair:
@@ -84,9 +95,18 @@ class DilithiumSigner:
         self._validate_algorithm()
 
     def _validate_algorithm(self) -> None:
-        """Verify the algorithm is supported by the installed liboqs version."""
+        """Verify the algorithm is supported by the installed liboqs version.
+
+        Automatically resolves NIST FIPS 204 / legacy name aliases so that config
+        values written for one liboqs version still work on another.
+        """
         supported = oqs.get_enabled_sig_mechanisms()
         if self._algorithm not in supported:
+            alias = _SIG_ALIASES.get(self._algorithm)
+            if alias and alias in supported:
+                # Transparently resolve to the installed version's name
+                self._algorithm = alias
+                return
             raise QSIPCryptoError(
                 f"Signature algorithm '{self._algorithm}' is not supported by the "
                 f"installed liboqs version. "

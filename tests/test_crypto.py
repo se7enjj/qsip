@@ -36,7 +36,7 @@ class TestKyberKEM:
         assert isinstance(kp, KEMKeypair)
         assert len(kp.public_key) > 0
         assert len(kp.secret_key) > 0
-        assert kp.algorithm == "Kyber1024"
+        assert kp.algorithm == "ML-KEM-1024"
 
     def test_keypair_repr_does_not_expose_secret_key(self, config: Config) -> None:
         """Secret key must never appear in repr()."""
@@ -123,7 +123,7 @@ class TestDilithiumSigner:
         kp = signer.generate_keypair()
         assert len(kp.verify_key) > 0
         assert len(kp.sign_key) > 0
-        assert kp.algorithm == "Dilithium5"
+        assert kp.algorithm == "ML-DSA-87"
 
     def test_keypair_repr_does_not_expose_sign_key(self, config: Config) -> None:
         """Sign key must never appear in repr()."""

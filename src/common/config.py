@@ -92,12 +92,12 @@ class Config(BaseSettings):
 
     # ── Cryptographic Algorithms ─────────────────────────────────────────────
     kem_algorithm: str = Field(
-        default="Kyber1024",
-        description="Key Encapsulation Mechanism. Default: Kyber1024 (highest security).",
+        default="ML-KEM-1024",
+        description="Key Encapsulation Mechanism. Default: ML-KEM-1024 (NIST FIPS 203, highest security).",
     )
     sig_algorithm: str = Field(
-        default="Dilithium5",
-        description="Digital signature algorithm. Default: Dilithium5 (highest security).",
+        default="ML-DSA-87",
+        description="Digital signature algorithm. Default: ML-DSA-87 (NIST FIPS 204, highest security).",
     )
     hash_algorithm: str = Field(
         default="SHA3-512",

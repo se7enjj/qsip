@@ -62,7 +62,15 @@ pythonpath = ["."]
 # ──────────────────────────────────────────────
 [tool.coverage.run]
 source = ["src"]
-omit = ["tests/*", "**/__init__.py"]
+omit = [
+    "tests/*",
+    "**/__init__.py",
+    # I/O-bound integration modules — require live network/SMTP/DNS/HTTP; excluded from unit coverage
+    "src/cli/main.py",
+    "src/web/server.py",
+    "src/dns/resolver.py",
+    "src/email/transport.py",
+]
 
 [tool.coverage.report]
 show_missing = true
@@ -79,6 +87,15 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
+exclude = [
+    'demo\.py',        # top-level demo script, not library code
+]
+
+[[tool.mypy.overrides]]
+# demo.py is an end-user script, not library code — skip strict analysis
+module = "demo"
+ignore_errors = true
+follow_imports = "skip"
 
 # ──────────────────────────────────────────────
 # Bandit (Security SAST)

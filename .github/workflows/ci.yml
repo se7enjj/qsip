@@ -54,7 +54,7 @@ jobs:
         env:
           QSIP_ENV: testing
           QSIP_LOG_LEVEL: WARNING
-          QSIP_KEM_ALGORITHM: Kyber1024
+          QSIP_KEM_ALGORITHM: ML-KEM-1024
           QSIP_SIG_ALGORITHM: ML-DSA-87
           QSIP_HYBRID_MODE: "false"
           QSIP_KEYSTORE_PASSPHRASE: ci-test-passphrase-not-a-secret
@@ -133,7 +133,7 @@ jobs:
         env:
           QSIP_ENV: testing
           QSIP_LOG_LEVEL: WARNING
-          QSIP_KEM_ALGORITHM: Kyber1024
+          QSIP_KEM_ALGORITHM: ML-KEM-1024
           QSIP_SIG_ALGORITHM: ML-DSA-87
           QSIP_HYBRID_MODE: "false"
           QSIP_KEYSTORE_PASSPHRASE: ci-test-passphrase-not-a-secret

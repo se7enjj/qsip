@@ -60,8 +60,8 @@ def testing_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     monkeypatch.setenv("QSIP_ENV", "testing")
     monkeypatch.setenv("QSIP_LOG_LEVEL", "WARNING")
-    monkeypatch.setenv("QSIP_KEM_ALGORITHM", "Kyber1024")
-    monkeypatch.setenv("QSIP_SIG_ALGORITHM", "Dilithium5")
+    monkeypatch.setenv("QSIP_KEM_ALGORITHM", "ML-KEM-1024")
+    monkeypatch.setenv("QSIP_SIG_ALGORITHM", "ML-DSA-87")
     monkeypatch.setenv("QSIP_HYBRID_MODE", "false")
     monkeypatch.setenv("QSIP_KEYSTORE_PASSPHRASE", "test-passphrase-ephemeral-only")
     monkeypatch.setenv("QSIP_SMTP_HOST", "smtp.test.invalid")

@@ -32,6 +32,17 @@ import oqs
 from src.common.config import Config
 from src.common.exceptions import QSIPCryptoError
 
+# Bidirectional alias map between liboqs legacy names and NIST FIPS 203 final names.
+# liboqs >= 0.10.0 uses ML-KEM-* exclusively; older builds used Kyber*.
+_KEM_ALIASES: dict[str, str] = {
+    "Kyber512": "ML-KEM-512",
+    "Kyber768": "ML-KEM-768",
+    "Kyber1024": "ML-KEM-1024",
+    "ML-KEM-512": "Kyber512",
+    "ML-KEM-768": "Kyber768",
+    "ML-KEM-1024": "Kyber1024",
+}
+
 
 @dataclass(frozen=True)
 class KEMKeypair:
@@ -114,9 +125,18 @@ class KyberKEM:
         self._validate_algorithm()
 
     def _validate_algorithm(self) -> None:
-        """Verify the algorithm is supported by the installed liboqs version."""
+        """Verify the algorithm is supported by the installed liboqs version.
+
+        Automatically resolves NIST FIPS 203 / legacy name aliases so that config
+        values written for one liboqs version still work on another.
+        """
         supported = oqs.get_enabled_kem_mechanisms()
         if self._algorithm not in supported:
+            alias = _KEM_ALIASES.get(self._algorithm)
+            if alias and alias in supported:
+                # Transparently resolve to the installed version's name
+                self._algorithm = alias
+                return
             raise QSIPCryptoError(
                 f"KEM algorithm '{self._algorithm}' is not supported by the "
                 f"installed liboqs version. "

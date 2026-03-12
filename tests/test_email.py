@@ -151,8 +151,8 @@ class TestPQEPComposer:
         )
 
         assert message["X-PQEP-Version"] == "1"
-        assert message["X-PQEP-KEM"] == "Kyber1024"
-        assert message["X-PQEP-SIG"] == "Dilithium5"
+        assert message["X-PQEP-KEM"] == "ML-KEM-1024"
+        assert message["X-PQEP-SIG"] == "ML-DSA-87"
         assert message["X-PQEP-Sender-PK"] is not None
         assert message["X-PQEP-KEM-CT"] is not None
         assert message["X-PQEP-Nonce"] is not None
