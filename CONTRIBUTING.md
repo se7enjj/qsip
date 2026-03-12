@@ -46,7 +46,7 @@ cp .env.example .env
 # Edit .env — set QSIP_KEYSTORE_PASSPHRASE to a strong random value
 
 pytest tests/ -v
-# All 128 tests must pass before submitting a PR
+# All 182 tests must pass before submitting a PR
 ```
 
 ---

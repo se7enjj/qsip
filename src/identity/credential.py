@@ -36,10 +36,14 @@ import secrets
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from enum import Enum
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from src.common.exceptions import IdentityError, QSIPCryptoError
 from src.crypto.signatures import DilithiumSigner
+
+if TYPE_CHECKING:
+    from src.identity.revocation import RevocationAccumulator
 
 
 class CredentialType(str, Enum):
@@ -191,9 +195,19 @@ class ZKCredential:
 
         return cred, blinding_factor
 
-    def verify_signature(self, issuer_verify_key: bytes, signer: DilithiumSigner) -> bool:
+    def verify_signature(
+        self,
+        issuer_verify_key: bytes,
+        signer: DilithiumSigner,
+        *,
+        accumulator: "RevocationAccumulator | None" = None,
+    ) -> bool:
         """
         Verify the issuer's signature on this credential.
+
+        Optionally checks a revocation accumulator.  When ``accumulator`` is
+        supplied and the credential has been revoked, returns ``False`` without
+        performing signature verification.
 
         Parameters
         ----------
@@ -201,12 +215,21 @@ class ZKCredential:
             The issuer's Dilithium verification key.
         signer : DilithiumSigner
             Configured Dilithium signer.
+        accumulator : RevocationAccumulator | None
+            Optional revocation accumulator.  If provided and the credential ID
+            is present in the accumulator, the credential is treated as invalid.
+            Always authenticate the accumulator's ``SignedRevocationRoot`` before
+            passing it here.
 
         Returns
         -------
         bool
-            True if signature is valid and credential is not expired.
+            True if signature is valid, credential is not expired, and the
+            credential has not been revoked (when accumulator is supplied).
         """
+        if accumulator is not None and accumulator.is_revoked(self.credential_id):
+            return False
+
         if self.is_expired():
             return False
 

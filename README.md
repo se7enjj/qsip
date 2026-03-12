@@ -1,7 +1,7 @@
 # QSIP — Quantum-Safe Internet Protocol Suite
 
 [![CI](https://github.com/se7enjj/qsip/actions/workflows/ci.yml/badge.svg)](https://github.com/se7enjj/qsip/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-162%20passed-brightgreen)](https://github.com/se7enjj/qsip/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-182%20passed-brightgreen)](https://github.com/se7enjj/qsip/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-%3E80%25-brightgreen)](https://github.com/se7enjj/qsip/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%20|%203.12-blue)](https://github.com/se7enjj/qsip)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
@@ -99,7 +99,8 @@ real, what uses a development mock, and what is planned.
 | Live browser demo (FastAPI SSE) | **Working** | `python serve.py` → http://localhost:8000 |
 | **CLI tools** (`qsip keygen/list/show/email/dns`) | **Working** | Developer CLI for all three protocol layers |
 | **Encrypted PQEP metadata** (Subject/From/To hiding) | **Working** | AES-256-GCM sub-key via separate HKDF info; composer hides Subject |
-| 162/162 unit tests | **Passing** | See test section below |
+| **Credential revocation** (Merkle accumulator) | **Working** | SHA3-256 sorted Merkle tree; Dilithium-signed root; inclusion proofs |
+| 182/182 unit tests | **Passing** | See test section below |
 
 ### The PQC Algorithms — Written Correctly, Running Under a Dev Mock
 
@@ -135,7 +136,6 @@ pytest tests/ -v  # now runs against real CRYSTALS algorithms
 | Feature | Target |
 |---------|--------|
 | Halo2 / Groth16 ZK circuits (replace Schnorr) | v0.3 Q2 2026 |
-| Credential revocation (Merkle accumulator) | v0.3 Q2 2026 |
 | Encrypted email header *display names* (MIME re-wrapping) | v0.4 Q3 2026 |
 | QSIP DNS zone signing + DoH support | v0.3 Q3 2026 |
 | HTTPQ browser extension (quantum padlock) | v0.4 Q3 2026 |
@@ -148,7 +148,7 @@ pytest tests/ -v  # now runs against real CRYSTALS algorithms
 
 ---
 
-## Test Suite — What 162/162 Passing Actually Means
+## Test Suite — What 182/182 Passing Actually Means
 
 ### What The Tests Genuinely Prove
 
@@ -166,6 +166,9 @@ pytest tests/ -v  # now runs against real CRYSTALS algorithms
 - Tampered issuer signature on a credential fails `verify_signature()`
 - Tampered PQEP email body raises `PQEPError`
 - Wrong recipient keypair on decrypt raises `PQEPError`
+- Revoked credential returns False from `verify_signature(accumulator=...)`
+- Tampered Merkle inclusion proof fails `RevocationProof.verify()`
+- Tampered revocation root signature fails `SignedRevocationRoot.verify_signature()`
 
 **Secret isolation:**
 - `repr()` of any key type contains `REDACTED`, never raw key bytes
@@ -200,7 +203,8 @@ src/
 ├── identity/       # ZK self-sovereign identity
 │   ├── keypair.py      PQC keypair + encrypted keystore
 │   ├── credential.py   Verifiable credentials with ZK commitments
-│   └── zk_proof.py     Schnorr ZK proofs (→ Halo2 in v0.3)
+│   ├── zk_proof.py     Schnorr ZK proofs (→ Halo2 in v0.3)
+│   └── revocation.py   Merkle accumulator — Dilithium-signed revocation lists
 ├── dns/            # PQC-signed DNS
 │   ├── resolver.py     DNS-over-TLS resolver
 │   └── validator.py    QSIP TXT record parser + PQC validation
@@ -261,7 +265,7 @@ cp .env.example .env
 # Set QSIP_KEYSTORE_PASSPHRASE to a strong random value — NEVER commit .env
 
 pytest tests/ -v
-# Expected: 162 passed
+# Expected: 182 passed
 ```
 
 ### Run the Live Browser Demo
@@ -416,7 +420,7 @@ Full threat model and vulnerability reporting: [SECURITY.md](SECURITY.md)
 |-----------|--------|-------|
 | v0.1 | Q1 2026 | Core crypto, protocol logic, 95 tests |
 | v0.2 | Q1 2026 | HTTPQ real TCP sockets, hybrid KEM (X25519+Kyber), live browser demo, 128 tests |
-| **v0.3 ← here** | Q2 2026 | CLI tools, encrypted PQEP metadata, 162 tests |
+| **v0.3 ← here** | Q2 2026 | CLI tools, encrypted PQEP metadata, credential revocation, 182 tests |
 | v0.3 cont. | Q3 2026 | Halo2 ZK circuits, credential revocation, DNS zone signing |
 | v0.4 | Q3–Q4 2026 | Browser extension, IETF Internet-Draft, CT log, BGP overlay, external audit |
 | v1.0 | 2027 | Full audited production release |
