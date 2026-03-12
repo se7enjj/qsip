@@ -32,10 +32,11 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import hashlib
 import secrets
 from base64 import b64decode, b64encode
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -49,9 +50,11 @@ from src.identity.keypair import IdentityKeyPair
 
 # Domain separation for HKDF contexts
 _HKDF_INFO_EMAIL = b"QSIP-PQEP-email-v1"
+_HKDF_INFO_META  = b"QSIP-PQEP-metadata-v1"  # Sub-key for optional metadata encryption
 # Static protocol salt for HKDF — provides domain separation and defends against
 # IKM correlation.  Per RFC 5869 §3.1 a fixed non-secret salt is better than None.
 _HKDF_SALT_EMAIL = b"QSIP-PQEP-salt-v1:email:AES256GCM"
+_HKDF_SALT_META  = b"QSIP-PQEP-salt-v1:metadata:AES256GCM"
 _AES_KEY_LENGTH = 32   # AES-256
 _GCM_NONCE_LENGTH = 12  # 96-bit nonce (GCM standard)
 
@@ -92,6 +95,11 @@ class PQEPEncryptedPayload:
     kem_algorithm: str
     sig_algorithm: str
     pqep_version: int
+    # Optional encrypted metadata bundle: {"subject", "from", "to"}
+    # Encrypted with a sub-key derived from the same KEM shared secret.
+    # None means metadata is not encrypted (cleartext in email headers).
+    encrypted_metadata: bytes | None = field(default=None)
+    metadata_nonce: bytes | None = field(default=None)
 
     def __repr__(self) -> str:
         return (
@@ -103,9 +111,9 @@ class PQEPEncryptedPayload:
             f"encrypted_body=<{len(self.encrypted_body)} bytes>)"
         )
 
-    def to_dict(self) -> dict[str, str | int]:
+    def to_dict(self) -> dict[str, str | int | None]:
         """Serialize to a safe JSON-compatible dict."""
-        return {
+        d: dict[str, str | int | None] = {
             "pqep_version": self.pqep_version,
             "kem_algorithm": self.kem_algorithm,
             "sig_algorithm": self.sig_algorithm,
@@ -115,11 +123,18 @@ class PQEPEncryptedPayload:
             "sender_signature": b64encode(self.sender_signature).decode(),
             "sender_verify_key": b64encode(self.sender_verify_key).decode(),
         }
+        if self.encrypted_metadata is not None:
+            d["encrypted_metadata"] = b64encode(self.encrypted_metadata).decode()
+        if self.metadata_nonce is not None:
+            d["metadata_nonce"] = b64encode(self.metadata_nonce).decode()
+        return d
 
     @classmethod
     def from_dict(cls, data: dict[str, str | int]) -> "PQEPEncryptedPayload":
         """Deserialize from a JSON-compatible dict."""
         try:
+            enc_meta_raw = data.get("encrypted_metadata")
+            meta_nonce_raw = data.get("metadata_nonce")
             return cls(
                 pqep_version=int(data["pqep_version"]),
                 kem_algorithm=str(data["kem_algorithm"]),
@@ -129,6 +144,8 @@ class PQEPEncryptedPayload:
                 encrypted_body=b64decode(str(data["encrypted_body"])),
                 sender_signature=b64decode(str(data["sender_signature"])),
                 sender_verify_key=b64decode(str(data["sender_verify_key"])),
+                encrypted_metadata=b64decode(str(enc_meta_raw)) if enc_meta_raw else None,
+                metadata_nonce=b64decode(str(meta_nonce_raw)) if meta_nonce_raw else None,
             )
         except Exception as exc:
             raise PQEPError(f"Failed to deserialize PQEPEncryptedPayload: {exc}") from exc
@@ -158,24 +175,34 @@ class PQEPEncryptor:
         plaintext: bytes,
         recipient_kem_public_key: bytes,
         sender_keypair: IdentityKeyPair,
+        metadata: dict[str, str] | None = None,
     ) -> PQEPEncryptedPayload:
         """
         Encrypt and sign an email body for a recipient.
 
         Pipeline:
-        1. Kyber KEM encapsulate → (kem_ciphertext, shared_secret)
-        2. HKDF(shared_secret) → aes_key
+        1. ML-KEM-1024 encapsulate → (kem_ciphertext, shared_secret)
+        2. HKDF-SHA3-512(shared_secret, info=email) → aes_key
         3. AES-256-GCM encrypt(plaintext) → (nonce, encrypted_body)
-        4. Dilithium sign(kem_ciphertext || nonce || encrypted_body) → signature
+        4. ML-DSA-87 sign(kem_ciphertext || nonce || encrypted_body) → signature
+        5. (Optional) If metadata provided:
+           HKDF-SHA3-512(shared_secret, info=metadata) → meta_key
+           AES-256-GCM encrypt(json(metadata)) → (metadata_nonce, encrypted_metadata)
 
         Parameters
         ----------
         plaintext : bytes
             The email body to encrypt.
         recipient_kem_public_key : bytes
-            The recipient's Kyber1024 public key.
+            The recipient's ML-KEM-1024 public key.
         sender_keypair : IdentityKeyPair
-            The sender's full identity keypair (used for Dilithium signing).
+            The sender's full identity keypair (used for ML-DSA-87 signing).
+        metadata : dict[str, str] | None
+            Optional metadata to encrypt alongside the body.
+            Typically: {"subject": "...", "from": "...", "to": "..."}.
+            Encrypted using a sub-key derived from the same shared secret
+            (domain-separated via a different HKDF info string), so the
+            recipient can decrypt both body and metadata with one KEM operation.
 
         Returns
         -------
@@ -218,6 +245,17 @@ class PQEPEncryptor:
             )
             signature = self._signer.sign(signable, sender_keypair.sig_keypair.sign_key)
 
+            # Step 5 (optional): Encrypt metadata with a domain-separated sub-key
+            encrypted_metadata: bytes | None = None
+            metadata_nonce: bytes | None = None
+            if metadata is not None:
+                meta_key = self._derive_meta_key(kem_result.shared_secret)
+                metadata_nonce = secrets.token_bytes(_GCM_NONCE_LENGTH)
+                meta_plaintext = json.dumps(metadata, separators=(",", ":")).encode()
+                encrypted_metadata = AESGCM(meta_key).encrypt(
+                    metadata_nonce, meta_plaintext, associated_data=b"QSIP-metadata"
+                )
+
         except PQEPError:
             raise
         except QSIPCryptoError as exc:
@@ -234,6 +272,8 @@ class PQEPEncryptor:
             kem_algorithm=self._kem.algorithm,
             sig_algorithm=self._signer.algorithm,
             pqep_version=self._config.pqep_version,
+            encrypted_metadata=encrypted_metadata,
+            metadata_nonce=metadata_nonce,
         )
 
     def decrypt(
@@ -323,6 +363,73 @@ class PQEPEncryptor:
             return hkdf.derive(shared_secret)
         except Exception as exc:
             raise PQEPError(f"HKDF key derivation failed: {exc}") from exc
+
+    def _derive_meta_key(self, shared_secret: bytes) -> bytes:
+        """Derive a domain-separated 256-bit key for metadata encryption.
+
+        Uses a different HKDF info/salt than the body key, ensuring these
+        keys are cryptographically independent even from the same shared secret.
+        """
+        try:
+            hkdf = HKDF(
+                algorithm=hashes.SHA3_512(),
+                length=_AES_KEY_LENGTH,
+                salt=_HKDF_SALT_META,
+                info=_HKDF_INFO_META,
+            )
+            return hkdf.derive(shared_secret)
+        except Exception as exc:
+            raise PQEPError(f"HKDF metadata key derivation failed: {exc}") from exc
+
+    def decrypt_metadata(
+        self,
+        payload: PQEPEncryptedPayload,
+        recipient_keypair: IdentityKeyPair,
+    ) -> dict[str, str] | None:
+        """
+        Decrypt the optional metadata bundle from a PQEP payload.
+
+        Must be called after verifying the payload (the body decrypt step
+        validates authenticity). This method performs a second KEM decapsulation
+        to recover the shared secret and derive the metadata sub-key.
+
+        Parameters
+        ----------
+        payload : PQEPEncryptedPayload
+            The PQEP payload containing the optional encrypted_metadata.
+        recipient_keypair : IdentityKeyPair
+            The recipient's identity keypair for KEM decapsulation.
+
+        Returns
+        -------
+        dict[str, str] | None
+            Decrypted metadata dict (e.g. {"subject", "from", "to"}),
+            or None if the payload contains no encrypted metadata.
+
+        Raises
+        ------
+        PQEPError
+            If metadata decryption fails (tampered or wrong key).
+        """
+        if payload.encrypted_metadata is None or payload.metadata_nonce is None:
+            return None
+        try:
+            shared_secret = self._kem.decapsulate(
+                payload.kem_ciphertext,
+                recipient_keypair.kem_keypair.secret_key,
+            )
+            meta_key = self._derive_meta_key(shared_secret)
+            meta_bytes = AESGCM(meta_key).decrypt(
+                payload.metadata_nonce,
+                payload.encrypted_metadata,
+                associated_data=b"QSIP-metadata",
+            )
+            result: dict[str, str] = json.loads(meta_bytes.decode())
+            return result
+        except PQEPError:
+            raise
+        except Exception as exc:
+            raise PQEPError(f"PQEP metadata decryption failed: {exc}") from exc
 
     @staticmethod
     def _signable_bytes(

@@ -6,30 +6,37 @@ Constructs RFC 5322-compatible email messages with Post-Quantum Email Protocol
 
 PQEP Headers added to each message:
     X-PQEP-Version: 1
-    X-PQEP-KEM: Kyber1024
-    X-PQEP-SIG: Dilithium5
-    X-PQEP-Sender-PK: <base64 Dilithium5 verify key>
-    X-PQEP-KEM-CT: <base64 Kyber ciphertext>
+    X-PQEP-KEM: ML-KEM-1024
+    X-PQEP-SIG: ML-DSA-87
+    X-PQEP-Sender-PK: <base64 ML-DSA-87 verify key>
+    X-PQEP-KEM-CT: <base64 ML-KEM ciphertext>
     X-PQEP-Nonce: <base64 AES-GCM nonce>
 
-The email body is replaced with the base64-encoded AES-256-GCM ciphertext.
-The MIME content type is set to `application/pqep` to signal PQEP-aware clients.
-Standard non-PQEP clients see the encrypted blob as an opaque attachment.
+Optional encrypted-metadata headers (v0.2+):
+    X-PQEP-Metadata: <base64 AES-256-GCM ciphertext of {subject, from, to}>
+    X-PQEP-Metadata-Nonce: <base64 AES-GCM nonce for metadata>
+
+When encrypted metadata is present, the plaintext Subject header is replaced
+with "[PQEP Encrypted]", hiding message subject and addressing from observers.
+The recipient uses PQEPEncryptor.decrypt_metadata() to recover the real values.
 
 Security:
-- Subject line is NOT encrypted in v0.1 (metadata minimization is v0.2 planned)
-- All headers exposing key material are base64-encoded (not hex) for compactness
-- The sender_signature is included in the body (not a header) to avoid header size limits
+- When metadata is not encrypted (default), Subject is plaintext (metadata leak!).
+- Enable metadata encryption by passing `metadata=...` to PQEPEncryptor.encrypt().
+- All headers exposing key material are base64-encoded for compactness.
+- The sender_signature is included in the body (not a header) to avoid header size limits.
 
-Usage:
-    composer = PQEPComposer(config)
-    message = composer.compose(
-        payload=encrypted_payload,
-        sender_address="alice@example.com",
-        recipient_address="bob@example.com",
-        subject="Hello",
+Usage (with encrypted metadata):
+    encryptor = PQEPEncryptor(config)
+    payload = encryptor.encrypt(
+        plaintext=b"Hello!",
+        recipient_kem_public_key=recipient_pk,
+        sender_keypair=sender,
+        metadata={"subject": "Secret topic", "from": "alice@example.com", "to": "bob@example.com"},
     )
-    raw = message.as_bytes()
+    composer = PQEPComposer(config)
+    message = composer.compose(payload, sender_address="alice@example.com", recipient_address="bob@example.com")
+    # Subject is now "[PQEP Encrypted]" in outbound email.
 """
 
 from __future__ import annotations
@@ -83,11 +90,13 @@ class PQEPComposer:
         payload : PQEPEncryptedPayload
             The encrypted payload from PQEPEncryptor.
         sender_address : str
-            Sender's email address (header only, not verified here).
+            Sender's email address (goes into the From header).
         recipient_address : str
             Recipient's email address.
         subject : str
-            Email subject line. NOT encrypted in v0.1 — keep minimal.
+            Email subject line. Used as cleartext ONLY when the payload does
+            not contain encrypted metadata. When payload.encrypted_metadata is
+            set, this param is ignored and Subject becomes "[PQEP Encrypted]".
             Max length: 200 characters.
 
         Returns
@@ -100,7 +109,10 @@ class PQEPComposer:
         PQEPError
             If message composition fails.
         """
-        if len(subject) > _MAX_SUBJECT_LENGTH:
+        # Only validate plaintext subject length when metadata is NOT encrypted.
+        # When metadata IS encrypted, the subject arg is ignored entirely.
+        metadata_encrypted = payload.encrypted_metadata is not None
+        if not metadata_encrypted and len(subject) > _MAX_SUBJECT_LENGTH:
             raise PQEPError(
                 f"Subject line too long ({len(subject)} > {_MAX_SUBJECT_LENGTH} chars). "
                 f"Note: subject lines are NOT encrypted — keep them minimal."
@@ -114,9 +126,12 @@ class PQEPComposer:
                 "%a, %d %b %Y %H:%M:%S %z"
             )
 
-            # Security note: subject is not encrypted in v0.1
-            # TODO: v0.2 — encrypt subject into PQEP header block
-            message["Subject"] = subject if subject else "[PQEP Encrypted Message]"
+            # Subject: hide behind generic placeholder when metadata is encrypted.
+            # The real subject is in payload.encrypted_metadata (decryptable by recipient).
+            if metadata_encrypted:
+                message["Subject"] = "[PQEP Encrypted]"
+            else:
+                message["Subject"] = subject if subject else "[PQEP Encrypted Message]"
 
             # PQEP extension headers
             message["X-PQEP-Version"] = str(payload.pqep_version)
@@ -125,6 +140,11 @@ class PQEPComposer:
             message["X-PQEP-Sender-PK"] = b64encode(payload.sender_verify_key).decode()
             message["X-PQEP-KEM-CT"] = b64encode(payload.kem_ciphertext).decode()
             message["X-PQEP-Nonce"] = b64encode(payload.nonce).decode()
+
+            # Optional encrypted metadata headers (v0.2+)
+            if payload.encrypted_metadata is not None and payload.metadata_nonce is not None:
+                message["X-PQEP-Metadata"] = b64encode(payload.encrypted_metadata).decode()
+                message["X-PQEP-Metadata-Nonce"] = b64encode(payload.metadata_nonce).decode()
 
             # Build the PQEP body: JSON envelope containing encrypted content + sig
             body_envelope = json.dumps({
@@ -189,5 +209,11 @@ class PQEPComposer:
                 f"Received email is missing required PQEP headers: {missing}. "
                 f"This message may not be PQEP-encrypted."
             )
+
+        # Optional metadata headers (v0.2+) — include if present
+        for opt_header in ("X-PQEP-Metadata", "X-PQEP-Metadata-Nonce"):
+            value = message.get(opt_header)
+            if value is not None:
+                headers[opt_header] = value
 
         return headers

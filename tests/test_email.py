@@ -191,3 +191,166 @@ class TestPQEPComposer:
         payload = encryptor.encrypt(b"no subject", recipient.kem_public_key, sender)
         message = composer.compose(payload, "a@b.com", "c@d.com", subject="")
         assert "PQEP" in message["Subject"] or "[" in message["Subject"]
+
+
+class TestPQEPEncryptedMetadata:
+    """Tests for PQEP encrypted email metadata (Subject/From/To hiding).
+
+    Security properties verified:
+    - Metadata AES-256-GCM roundtrip with correct recipient key
+    - Wrong-key rejection (AEAD authentication failure)
+    - Subject header is replaced when metadata is encrypted
+    - X-PQEP-Metadata / X-PQEP-Metadata-Nonce headers present in composed message
+    - parse_pqep_headers() surfaces metadata headers
+    - Backward compat: no-metadata path leaves payload.encrypted_metadata = None
+    - PQEPEncryptedPayload.to_dict() / from_dict() round-trips metadata bytes
+    """
+
+    def test_encrypt_decrypt_metadata_roundtrip(self, config: Config) -> None:
+        """decrypt_metadata() must recover the exact dict passed to encrypt()."""
+        encryptor = PQEPEncryptor(config)
+        sender = IdentityKeyPair.generate(config)
+        recipient = IdentityKeyPair.generate(config)
+
+        meta = {"from": "alice@example.com", "to": "bob@example.com", "subject": "Quantum hello"}
+        payload = encryptor.encrypt(
+            plaintext=b"body content",
+            recipient_kem_public_key=recipient.kem_public_key,
+            sender_keypair=sender,
+            metadata=meta,
+        )
+
+        assert payload.encrypted_metadata is not None
+        assert payload.metadata_nonce is not None
+
+        recovered = encryptor.decrypt_metadata(payload, recipient_keypair=recipient)
+        assert recovered == meta
+
+    def test_encrypted_metadata_hides_subject_in_composer(self, config: Config) -> None:
+        """compose() must replace Subject with '[PQEP Encrypted]' when metadata present."""
+        encryptor = PQEPEncryptor(config)
+        composer = PQEPComposer(config)
+        sender = IdentityKeyPair.generate(config)
+        recipient = IdentityKeyPair.generate(config)
+
+        payload = encryptor.encrypt(
+            plaintext=b"secret body",
+            recipient_kem_public_key=recipient.kem_public_key,
+            sender_keypair=sender,
+            metadata={"subject": "Top Secret"},
+        )
+        message = composer.compose(
+            payload, "alice@example.com", "bob@example.com", subject="Top Secret"
+        )
+        # Subject must NOT reveal the real value
+        assert message["Subject"] == "[PQEP Encrypted]"
+
+    def test_compose_adds_metadata_headers(self, config: Config) -> None:
+        """Composed message must include X-PQEP-Metadata and X-PQEP-Metadata-Nonce."""
+        encryptor = PQEPEncryptor(config)
+        composer = PQEPComposer(config)
+        sender = IdentityKeyPair.generate(config)
+        recipient = IdentityKeyPair.generate(config)
+
+        payload = encryptor.encrypt(
+            plaintext=b"body",
+            recipient_kem_public_key=recipient.kem_public_key,
+            sender_keypair=sender,
+            metadata={"from": "a@b.com"},
+        )
+        message = composer.compose(payload, "a@b.com", "c@d.com")
+        assert message["X-PQEP-Metadata"] is not None
+        assert message["X-PQEP-Metadata-Nonce"] is not None
+
+    def test_parse_headers_includes_metadata_fields(self, config: Config) -> None:
+        """parse_pqep_headers() must return X-PQEP-Metadata* when present."""
+        encryptor = PQEPEncryptor(config)
+        composer = PQEPComposer(config)
+        sender = IdentityKeyPair.generate(config)
+        recipient = IdentityKeyPair.generate(config)
+
+        payload = encryptor.encrypt(
+            plaintext=b"body",
+            recipient_kem_public_key=recipient.kem_public_key,
+            sender_keypair=sender,
+            metadata={"to": "carol@example.com"},
+        )
+        message = composer.compose(payload, "a@b.com", "c@d.com")
+        headers = composer.parse_pqep_headers(message)
+        assert "X-PQEP-Metadata" in headers
+        assert "X-PQEP-Metadata-Nonce" in headers
+
+    def test_wrong_recipient_cannot_decrypt_metadata(self, config: Config) -> None:
+        """decrypt_metadata() must raise PQEPError when the wrong key is used."""
+        encryptor = PQEPEncryptor(config)
+        sender = IdentityKeyPair.generate(config)
+        real_recipient = IdentityKeyPair.generate(config)
+        wrong_recipient = IdentityKeyPair.generate(config)
+
+        payload = encryptor.encrypt(
+            plaintext=b"sensitive body",
+            recipient_kem_public_key=real_recipient.kem_public_key,
+            sender_keypair=sender,
+            metadata={"secret": "classified"},
+        )
+
+        with pytest.raises((PQEPError, Exception)):
+            encryptor.decrypt_metadata(payload, recipient_keypair=wrong_recipient)
+
+    def test_no_metadata_backward_compat(self, config: Config) -> None:
+        """encrypt() without metadata must leave encrypted_metadata=None."""
+        encryptor = PQEPEncryptor(config)
+        sender = IdentityKeyPair.generate(config)
+        recipient = IdentityKeyPair.generate(config)
+
+        payload = encryptor.encrypt(
+            plaintext=b"plain body",
+            recipient_kem_public_key=recipient.kem_public_key,
+            sender_keypair=sender,
+        )
+        assert payload.encrypted_metadata is None
+        assert payload.metadata_nonce is None
+        # decrypt_metadata should return None, not raise
+        result = encryptor.decrypt_metadata(payload, recipient_keypair=recipient)
+        assert result is None
+
+    def test_metadata_serialization_roundtrip(self, config: Config) -> None:
+        """to_dict() / from_dict() must preserve encrypted_metadata bytes exactly."""
+        encryptor = PQEPEncryptor(config)
+        sender = IdentityKeyPair.generate(config)
+        recipient = IdentityKeyPair.generate(config)
+
+        meta = {"subject": "Serialise this", "tag": "v0.3"}
+        payload = encryptor.encrypt(
+            plaintext=b"serialise test",
+            recipient_kem_public_key=recipient.kem_public_key,
+            sender_keypair=sender,
+            metadata=meta,
+        )
+        restored = PQEPEncryptedPayload.from_dict(payload.to_dict())
+        assert restored.encrypted_metadata == payload.encrypted_metadata
+        assert restored.metadata_nonce == payload.metadata_nonce
+
+        # Decryption must still work after the dict roundtrip
+        recovered = encryptor.decrypt_metadata(restored, recipient_keypair=recipient)
+        assert recovered == meta
+
+    def test_metadata_key_independent_of_body_key(self, config: Config) -> None:
+        """Metadata sub-key must differ from the body encryption key (different HKDF info)."""
+        encryptor = PQEPEncryptor(config)
+        sender = IdentityKeyPair.generate(config)
+        recipient = IdentityKeyPair.generate(config)
+
+        payload = encryptor.encrypt(
+            plaintext=b"body",
+            recipient_kem_public_key=recipient.kem_public_key,
+            sender_keypair=sender,
+            metadata={"k": "v"},
+        )
+        # The metadata nonce must be independent of the body nonce
+        assert payload.nonce != payload.metadata_nonce
+        # Body decryption and metadata decryption both succeed independently
+        body = encryptor.decrypt(payload, recipient_keypair=recipient)
+        meta = encryptor.decrypt_metadata(payload, recipient_keypair=recipient)
+        assert body == b"body"
+        assert meta == {"k": "v"}

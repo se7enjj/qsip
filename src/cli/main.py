@@ -256,7 +256,7 @@ def cmd_dns_make_record(args: argparse.Namespace) -> int:
     print("DNS TXT record (place at _pqc." + args.domain + ". IN TXT):\n")
     print(txt)
     print(f"\n  Record length: {len(txt)} chars")
-    print(f"  Signature    : {len(sig)} bytes (Dilithium5)")
+    print(f"  Signature    : {len(sig)} bytes ({keypair.sig_keypair.algorithm})")
     return 0
 
 
@@ -285,7 +285,7 @@ def cmd_dns_verify(args: argparse.Namespace) -> int:
     valid = signer.verify(canonical_data, sig, pk)
 
     if valid:
-        print(f"\n  {chr(10003)} Dilithium5 signature VALID — DNS record is authentic.")
+        print(f"\n  {chr(10003)} {parsed['alg']} signature VALID — DNS record is authentic.")
         return 0
     else:
         print(f"\n  ✗ Signature INVALID — DNS record may be tampered.")
@@ -308,9 +308,9 @@ def build_parser() -> argparse.ArgumentParser:
             QSIP — Quantum-Safe Internet Protocol Suite
 
             A post-quantum cryptography toolkit implementing:
-              • Self-sovereign ZK identity (CRYSTALS-Dilithium5)
-              • PQEP encrypted email      (CRYSTALS-Kyber1024 + AES-256-GCM)
-              • PQC-signed DNS validation (CRYSTALS-Dilithium5)
+              • Self-sovereign ZK identity (ML-DSA-87 / NIST FIPS 204)
+              • PQEP encrypted email      (ML-KEM-1024 + AES-256-GCM / NIST FIPS 203)
+              • PQC-signed DNS validation (ML-DSA-87)
 
             All algorithms are NIST FIPS 203 / FIPS 204 compliant.
         """),
@@ -341,7 +341,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_enc = email_sub.add_parser("encrypt", help="Encrypt a message for a recipient")
     p_enc.add_argument("--sender", "-s", required=True, help="Sender identity ID")
     p_enc.add_argument("--recipient-pk", "-r", required=True,
-                       help="Recipient Kyber1024 public key (hex or base64 or file path)")
+                       help="Recipient ML-KEM-1024 public key (hex or base64 or file path)")
     p_enc.add_argument("--input", "-i", default="-", help="Input plaintext file (default: stdin)")
     p_enc.add_argument("--output", "-o", default="-", help="Output .pqep JSON file (default: stdout)")
     p_enc.set_defaults(func=cmd_email_encrypt)

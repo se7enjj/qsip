@@ -66,7 +66,6 @@ omit = [
     "tests/*",
     "**/__init__.py",
     # I/O-bound integration modules — require live network/SMTP/DNS/HTTP; excluded from unit coverage
-    "src/cli/main.py",
     "src/web/server.py",
     "src/dns/resolver.py",
     "src/email/transport.py",
