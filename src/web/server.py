@@ -31,6 +31,8 @@ SSE event format:
 
 from __future__ import annotations
 
+import types as _types
+
 # ── OQS mock injection (same pattern as conftest.py + demo.py) ───────────────
 import ctypes, ctypes.util, sys as _sys
 
@@ -46,7 +48,8 @@ for _c in ("oqs", "liboqs", "liboqs-0"):
         break
 if not _NATIVE_FOUND and "oqs" not in _sys.modules:
     from tests._oqs_mock import build_oqs_mock
-    _sys.modules["oqs"] = build_oqs_mock()  # type: ignore
+    _sys.modules["oqs"] = _types.ModuleType.__new__(_types.ModuleType)
+    _sys.modules["oqs"].__dict__.update(build_oqs_mock().__dict__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 import asyncio
@@ -96,7 +99,7 @@ _CONFIG = Config()
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def _ev(data: dict) -> str:
+def _ev(data: dict[str, object]) -> str:
     """Format a single SSE data frame."""
     return f"data: {json.dumps(data)}\n\n"
 
@@ -416,6 +419,9 @@ async def _stream_dns(config: Config) -> AsyncIterator[str]:
 
     yield _ev({"type": "step", "label": "Resolver parses and validates"})
     parsed = validator.parse_qsip_record(txt)
+    if parsed is None:
+        yield _ev({"type": "fail", "msg": "Failed to parse QSIP TXT record"})
+        return
     rpk    = b64decode(parsed["pk"]); rsig = b64decode(parsed["sig"])
     valid  = await loop.run_in_executor(None, lambda: signer.verify(data, rsig, rpk))
     if valid:
@@ -472,7 +478,7 @@ async def stream_all() -> StreamingResponse:
 @app.get("/api/stream/identity")
 async def stream_identity() -> StreamingResponse:
     config = Config()
-    async def _gen():
+    async def _gen() -> AsyncIterator[str]:
         async for ev in _stream_identity(config):
             yield ev
     return StreamingResponse(_gen(), media_type="text/event-stream",
@@ -482,7 +488,7 @@ async def stream_identity() -> StreamingResponse:
 @app.get("/api/stream/httpq")
 async def stream_httpq() -> StreamingResponse:
     config = Config()
-    async def _gen():
+    async def _gen() -> AsyncIterator[str]:
         async for ev in _stream_httpq(config):
             yield ev
     return StreamingResponse(_gen(), media_type="text/event-stream",
@@ -493,7 +499,7 @@ async def stream_httpq() -> StreamingResponse:
 async def stream_email() -> StreamingResponse:
     """SSE: Layer 2 — Post-Quantum Email Protocol (PQEP)."""
     config = Config()
-    async def _gen():
+    async def _gen() -> AsyncIterator[str]:
         async for ev in _stream_email(config):
             yield ev
     return StreamingResponse(_gen(), media_type="text/event-stream",
@@ -504,7 +510,7 @@ async def stream_email() -> StreamingResponse:
 async def stream_dns() -> StreamingResponse:
     """SSE: Layer 3 — PQC-secured DNS (quantum-safe DNSSEC)."""
     config = Config()
-    async def _gen():
+    async def _gen() -> AsyncIterator[str]:
         async for ev in _stream_dns(config):
             yield ev
     return StreamingResponse(_gen(), media_type="text/event-stream",

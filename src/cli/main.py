@@ -31,7 +31,7 @@ from __future__ import annotations
 import ctypes
 import ctypes.util
 import sys
-import os
+import types as _types
 
 _NATIVE_FOUND: bool = False
 for _candidate in ("oqs", "liboqs", "liboqs-0"):
@@ -47,16 +47,24 @@ for _candidate in ("oqs", "liboqs", "liboqs-0"):
 if not _NATIVE_FOUND and "oqs" not in sys.modules:
     try:
         from tests._oqs_mock import build_oqs_mock
-        sys.modules["oqs"] = build_oqs_mock()  # type: ignore[assignment]
+        mod = _types.ModuleType("oqs")
+        mod.__dict__.update(build_oqs_mock().__dict__)
+        sys.modules["oqs"] = mod
     except ImportError:
         pass  # Running from installed wheel — mock not available; real liboqs required
 # ─────────────────────────────────────────────────────────────────────────────
 
 import argparse
 import getpass
+import os
 import textwrap
 from base64 import b64encode, b64decode
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.common.config import Config
+    from src.identity.keypair import IdentityKeyPair
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

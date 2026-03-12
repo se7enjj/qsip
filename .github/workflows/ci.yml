@@ -40,6 +40,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
           pip install "genbadge[coverage]"
+          # NOTE: liboqs-python (native C binding) is intentionally NOT installed here.
+          # The test suite auto-injects tests/_oqs_mock.py when the native library
+          # is absent. See requirements-native.txt for the real liboqs binding.
 
       - name: Run tests with coverage
         run: |
@@ -119,8 +122,7 @@ jobs:
       - name: Install Python dependencies (including liboqs-python)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
-          pip install liboqs-python
+          pip install -r requirements.txt -r requirements-dev.txt -r requirements-native.txt
 
       - name: Run tests against native liboqs
         run: |

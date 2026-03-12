@@ -5,12 +5,11 @@
 # Verify integrity: pip install --require-hashes -r requirements.txt
 # ============================================================
 
-# Post-Quantum Cryptography (liboqs Python bindings)
-# NIST FIPS 203 (Kyber) + FIPS 204 (Dilithium) + FIPS 205 (SPHINCS+)
-# NOTE: This is NOT the PyPI 'oqs' package (that is an unrelated OQS Interpreter).
-# liboqs-python wraps the native Open Quantum Safe C library.
-# See docs/ARCHITECTURE.md for native build instructions on Windows / Linux.
-liboqs-python>=0.10.0
+# Post-Quantum Cryptography — native liboqs bindings are OPTIONAL.
+# On systems with liboqs compiled, also install requirements-native.txt:
+#   pip install -r requirements.txt -r requirements-native.txt
+# The test suite auto-falls-back to a behaviorally-correct mock when
+# the native library is absent (no compilation required for development).
 
 # Classical cryptography — AES-GCM, HKDF, X25519, Argon2id
 # Used for hybrid mode and symmetric operations

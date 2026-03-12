@@ -249,7 +249,7 @@ class ZKCredential:
         """Return True if the credential has passed its expiry date."""
         return datetime.now(tz=timezone.utc) > self.expires_at
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         """Serialize to a public JSON-safe dict (no secrets)."""
         from base64 import b64encode
         return {

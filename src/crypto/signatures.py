@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import oqs  # type: ignore[import]
+import oqs
 
 from src.common.config import Config
 from src.common.exceptions import QSIPCryptoError

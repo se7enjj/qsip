@@ -23,7 +23,7 @@ QSIP is security-critical infrastructure. Please read this document fully before
 ## What We Do Not Accept
 
 - New cryptographic primitives implemented from scratch — use `oqs` or `cryptography` (PyCA) only
-- Any dependency not in the approved list in `.github/copilot-instructions.md` without discussion
+- Any cryptographic dependency not listed in the [Approved Dependencies](docs/ARCHITECTURE.md#approved-dependencies) section of the architecture docs, without prior discussion
 - Anything that weakens algorithm strengths (e.g. downgrading Kyber1024 to Kyber512)
 - PRs that break the test suite
 

@@ -38,9 +38,9 @@ classifiers = [
 qsip = "src.cli.main:main"
 
 [project.urls]
-Repository = "https://github.com/your-org/qsip"
-Documentation = "https://github.com/your-org/qsip/blob/main/docs/ARCHITECTURE.md"
-"Security Policy" = "https://github.com/your-org/qsip/blob/main/SECURITY.md"
+Repository = "https://github.com/se7enjj/qsip"
+Documentation = "https://github.com/se7enjj/qsip/blob/main/docs/ARCHITECTURE.md"
+"Security Policy" = "https://github.com/se7enjj/qsip/blob/main/SECURITY.md"
 
 [tool.setuptools.packages.find]
 where = ["."]

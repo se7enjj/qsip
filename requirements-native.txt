@@ -1,0 +1,19 @@
+# ============================================================
+# QSIP — Native liboqs Python bindings
+#
+# Install this ONLY on systems where the native liboqs C library
+# has been compiled and installed (Linux / macOS with cmake).
+# See docs/ARCHITECTURE.md for build instructions.
+#
+# On Windows dev machines or CI mock jobs, this is NOT needed —
+# the test suite auto-injects tests/_oqs_mock.py instead.
+#
+# Usage:
+#   pip install -r requirements.txt -r requirements-native.txt
+# ============================================================
+
+# POST-QUANTUM CRYPTOGRAPHY — native liboqs Python bindings
+# NIST FIPS 203 (Kyber) + FIPS 204 (Dilithium) + FIPS 205 (SPHINCS+)
+# NOTE: This is NOT the PyPI 'oqs' package (that is an unrelated interpreter).
+# Requires liboqs native C library built and installed first.
+liboqs-python>=0.10.0

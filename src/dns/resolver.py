@@ -285,7 +285,7 @@ class PQCResolver:
 
     def _extract_records(self, response: Any, rdtype: Any) -> list[str]:
         """Extract record strings from a dnspython response."""
-        records = []
+        records: list[str] = []
         for rrset in response.answer:
             if rrset.rdtype == rdtype:
                 records.extend(str(rd) for rd in rrset)

@@ -381,7 +381,7 @@ class KeyStore:
         if not self._path.exists():
             return {}
         try:
-            return json.loads(self._path.read_text(encoding="utf-8"))
+            return dict(json.loads(self._path.read_text(encoding="utf-8")))
         except Exception as exc:
             raise KeystoreError(f"Failed to read keystore file: {exc}") from exc
 
