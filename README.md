@@ -20,10 +20,10 @@ critical internet layers to be quantum-safe and privacy-preserving:
 
 | Layer | Problem It Solves | Algorithms |
 |-------|------------------|------------|
-| **ZK Identity** | PKI / OAuth / CA trust collapses under Shor's algorithm | Dilithium5, Schnorr ZK (→ Halo2 in v0.3) |
-| **PQC DNS** | DNSSEC signatures are forged by quantum computers | Kyber1024 KEM, Dilithium5 DNS TXT records |
-| **PQ Email (PQEP)** | "Harvest now, decrypt later" — your encrypted email is being stored now | Kyber1024 KEM, AES-256-GCM, X25519 hybrid |
-| **HTTPQ** | HTTPS / TLS uses quantum-breakable ECDH + RSA/ECDSA certificates | Kyber1024 KEM handshake, ML-DSA-87 certificates — real TCP sockets |
+| **ZK Identity** | PKI / OAuth / CA trust collapses under Shor's algorithm | ML-DSA-87, Schnorr ZK (→ Halo2 in v0.4) |
+| **PQC DNS** | DNSSEC signatures are forged by quantum computers | ML-KEM-1024 KEM, ML-DSA-87 DNS TXT records |
+| **PQ Email (PQEP)** | "Harvest now, decrypt later" — your encrypted email is being stored now | ML-KEM-1024 KEM, AES-256-GCM, X25519 hybrid |
+| **HTTPQ** | HTTPS / TLS uses quantum-breakable ECDH + RSA/ECDSA certificates | ML-KEM-1024 KEM handshake, ML-DSA-87 certificates — real TCP sockets |
 
 These layers form an **interlocking stack**:
 
@@ -75,7 +75,7 @@ computer is built tomorrow. That is the entire point of deploying PQC today.
 
 ---
 
-## Honest State of the Project (v0.2, March 2026)
+## Honest State of the Project (v0.3, March 2026)
 
 QSIP is a **validated lab prototype**. Here is an exact breakdown of what is
 real, what uses a development mock, and what is planned.
@@ -209,7 +209,7 @@ src/
 │   ├── resolver.py     DNS-over-TLS resolver
 │   └── validator.py    QSIP TXT record parser + PQC validation
 ├── email/          # Post-Quantum Email Protocol
-│   ├── encryptor.py    KEM + AES-256-GCM + Dilithium signing
+│   ├── encryptor.py    KEM + AES-256-GCM + ML-DSA-87 signing
 │   ├── composer.py     RFC 5322 with PQEP extension headers
 │   └── transport.py    SMTP/IMAP — mandatory TLS 1.3, no downgrade
 ├── ca/             # Quantum-safe Certificate Authority (like Let's Encrypt)
@@ -279,7 +279,7 @@ python serve.py
 
 ### HTTPQ Quantum-Safe TCP Connection
 
-A real client–server handshake over TCP using Kyber1024 KEM + ML-DSA-87 certificates.
+A real client–server handshake over TCP using ML-KEM-1024 KEM + ML-DSA-87 certificates.
 
 **Pure-Kyber mode** (compatible with all HTTPQ peers):
 
@@ -421,7 +421,7 @@ Full threat model and vulnerability reporting: [SECURITY.md](SECURITY.md)
 | v0.1 | Q1 2026 | Core crypto, protocol logic, 95 tests |
 | v0.2 | Q1 2026 | HTTPQ real TCP sockets, hybrid KEM (X25519+Kyber), live browser demo, 128 tests |
 | **v0.3 ← here** | Q2 2026 | CLI tools, encrypted PQEP metadata, credential revocation, 182 tests |
-| v0.3 cont. | Q3 2026 | Halo2 ZK circuits, credential revocation, DNS zone signing |
+| v0.3 cont. | Q3 2026 | Halo2 ZK circuits, DNS zone signing |
 | v0.4 | Q3–Q4 2026 | Browser extension, IETF Internet-Draft, CT log, BGP overlay, external audit |
 | v1.0 | 2027 | Full audited production release |
 
@@ -432,7 +432,7 @@ Full details: [docs/ROADMAP.md](docs/ROADMAP.md)
 ## FAQ
 
 **Q: Is QSIP safe for real communications today?**  
-No. v0.2 is a research prototype without external audit. Do not protect sensitive
+No. v0.3 is a research prototype without external audit. Do not protect sensitive
 communications with it yet. Target: v0.4 / v1.0.
 
 **Q: Does QSIP replace TLS?**  
